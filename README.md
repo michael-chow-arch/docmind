@@ -1,208 +1,340 @@
 # DocMind
 
-**DocMind** is an open‑source, production‑oriented **multimodal document intelligence platform**.
+**DocMind** is a backend-first document intelligence project focused on building a clean, extensible foundation for document ingestion, semantic retrieval, and LLM-powered question answering.
 
-It enables you to ingest complex PDF documents, extract **text, images, and tables**, store them in a **vector database**, and interact with the content through a **multimodal RAG (Retrieval‑Augmented Generation) chat interface**.
+The current public version is **text-first**: it supports document upload, text extraction, chunking, vector search with pgvector, and answer generation with LLMs. The architecture is intentionally designed to be **multimodal-ready**, with future support planned for richer document assets such as tables, images, OCR-heavy files, and stronger evidence grounding.
 
-DocMind is designed with **real deployment and extensibility** in mind rather than as a toy demo or one‑off experiment.
+This repository is maintained as a **portfolio / interview-facing backend engineering project**, with emphasis on:
 
----
-
-## Why DocMind
-
-Most existing “Chat with PDF” projects focus on quick demos:
-
-* Text‑only RAG
-* Single‑file scripts
-* Tight coupling to one LLM provider
-* Limited extensibility
-
-**DocMind is different.**
-
-It focuses on:
-
-* 🧠 **Multimodal understanding** (text + figures + tables)
-* 🏗️ **Clean system architecture** suitable for production
-* 🔌 **Pluggable LLM / embedding backends**
-* 📦 **End‑to‑end pipeline** from document ingestion to chat UI
+- modular service boundaries
+- async-first API design
+- pluggable embedding provider (OpenAI or SBERT)
+- vector retrieval with PostgreSQL + pgvector
+- maintainable structure for future multimodal expansion
 
 ---
 
-## Core Features
+## Why this project
 
-* **Document Ingestion Pipeline**
+Many document chat demos stop at “upload a PDF and ask a question.”
 
-  * PDF parsing with Docling
-  * Text chunking for vector storage
-  * Image extraction with metadata
-  * Table extraction (structured data + rendered images)
+DocMind is built with a broader engineering goal:
 
-* **Vector‑based Retrieval**
+- separate ingestion, retrieval, and answer generation concerns
+- keep the codebase extensible instead of tightly coupling everything to one LLM flow
+- evolve from a text-first MVP into a richer document intelligence foundation
 
-  * PostgreSQL + pgvector
-  * Metadata‑aware similarity search
-  * Image / table references preserved in retrieval
+The goal is not just to produce answers, but to build a codebase that can support:
 
-* **Multimodal RAG Chat**
-
-  * Text answers grounded in document context
-  * Related images and tables returned with answers
-  * Multi‑turn conversation support
-
-* **Production‑Ready Architecture**
-
-  * Clear service boundaries
-  * Async backend (FastAPI)
-  * Dockerized infrastructure
+- better retrieval quality
+- stronger evidence tracing
+- multimodal asset handling
+- more production-grade operational patterns over time
 
 ---
 
-## System Architecture
+## Current status
 
+### Implemented in the current public version
+
+- FastAPI backend with modular structure
+- async API layer
+- document upload and local storage
+- text extraction for supported documents
+- text chunking and embedding generation
+- semantic retrieval using PostgreSQL + pgvector
+- LLM-based answer generation
+- conversation/session-oriented question answering flow
+- configurable embedding provider abstraction
+- local development setup with Docker Compose
+- async-aligned tests for core application paths
+
+### Planned / in progress
+
+The following items are part of the intended roadmap, but are **not fully implemented yet** in the current public version:
+
+- full multimodal document parsing
+- table extraction and table-aware retrieval
+- image extraction and image-grounded QA
+- OCR-heavy document support improvements
+- stronger reranking beyond current heuristic approaches
+- stricter citation grounding and claim-to-evidence validation
+- background ingestion workflow for heavier document processing
+- cloud/object storage support such as S3 or MinIO
+- migration-oriented schema management
+- frontend application / full end-to-end product layer
+
+---
+
+## Architecture overview
+
+DocMind is currently a **backend-first** system with separation between API, application logic, infrastructure concerns, and persistence.
+
+```text
+backend/
+├── app/
+│   ├── api/               # FastAPI routes and request handling
+│   ├── application/       # application services / orchestration logic
+│   ├── core/              # settings, logging, shared config
+│   ├── db/                # database session / base setup
+│   ├── domains/           # project business modules and data models
+│   └── infrastructure/    # storage, embeddings, LLM, document processing
+├── tests/
+├── pyproject.toml
+└── docker-compose.yml
 ```
-Frontend (Next.js)
-   │
-   ▼
-Backend API (FastAPI)
-   │
-   ├── Document Ingestion Pipeline
-   │     ├── PDF Parsing (Docling)
-   │     ├── Text Chunking
-   │     ├── Image / Table Extraction
-   │
-   ├── Retrieval Layer
-   │     └── PostgreSQL + pgvector
-   │
-   └── RAG Engine
-         ├── Context Retrieval
-         ├── Multimodal Prompting
-         └── LLM Response Generation
-```
+
+### Design goals
+
+- keep business flow readable
+- isolate infrastructure-specific code where practical
+- make provider replacement easier
+- support gradual evolution toward stronger retrieval and richer document understanding
+
+This repository should currently be viewed as a **well-structured MVP / engineering foundation**, not as a fully production-hardened platform.
 
 ---
 
-## Tech Stack
+## Core flow
+
+The current request flow is:
+
+1. upload a document
+2. extract text content
+3. chunk the extracted content
+4. generate embeddings
+5. store chunks and vectors in PostgreSQL + pgvector
+6. retrieve relevant chunks for a query
+7. generate an answer using retrieved context
+8. return the answer with supporting context metadata
+
+The current implementation is best described as:
+
+**text-first RAG with multimodal-ready architecture**
+
+---
+
+## Tech stack
 
 ### Backend
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- pgvector
+- Pydantic
 
-* **Framework**: FastAPI
-* **PDF Processing**: Docling
-* **Vector Store**: PostgreSQL + pgvector
-* **Embeddings**: OpenAI / HuggingFace (pluggable)
-* **LLM Providers**: OpenAI, Ollama (pluggable)
-* **Cache / Queue**: Redis (optional)
+### AI / Retrieval
+- OpenAI API
+- Sentence Transformers
+- vector similarity search with pgvector
 
-### Frontend
-
-* **Framework**: Next.js (App Router)
-* **Styling**: TailwindCSS
-* **UI Components**: shadcn/ui
-
-### Infrastructure
-
-* Docker & Docker Compose
-* PostgreSQL 15
-* Redis
+### Dev / Infra
+- Docker Compose
+- Poetry
+- Python 3.11+
 
 ---
 
-## Getting Started
+## Key engineering ideas
 
-### Prerequisites
+### 1. Backend-first, not demo-first
+This repository prioritizes maintainable backend structure over a quick UI demo.
 
-* Docker & Docker Compose
-* Node.js 18+
-* Python 3.11+
+### 2. Embedding provider abstraction
+Only the embedding provider is configurable (OpenAI or SBERT). LLM answers use OpenAI API.
 
-(Optional)
+### 3. Retrieval as a first-class concern
+The system is built around chunk storage, vector search, and retrieval quality rather than treating retrieval as an afterthought.
 
-* OpenAI API Key **or** Ollama (local LLM)
+### 4. Multimodal-ready direction
+Although the current public version is text-focused, the structure is intended to support richer document assets in future iterations.
 
 ---
 
-### Quick Start
+## What this project is not yet
+
+To keep the project honest and easier to discuss in interviews, the current public version should **not** be overstated as:
+
+It is **not yet**:
+
+- a fully production-ready SaaS platform
+- a complete multimodal RAG system
+- a finished frontend + backend product
+- a benchmark-heavy retrieval research project
+- a distributed ingestion platform
+
+Instead, it is currently best viewed as:
+
+> a solid backend prototype for document intelligence, with clear extension points for future multimodal and production-grade capabilities
+
+---
+
+## Local development
+
+### 1. Clone the repository
 
 ```bash
-# Clone repository
-git clone https://github.com/yourname/docmind.git
-cd docmind
-
-# Environment setup
-cp .env.example .env
-
-# Start services
-docker-compose up -d
+git clone https://github.com/Michael429-zzZ/docmind.git
+cd docmind/backend
 ```
 
-Access:
+### 2. Install dependencies
 
-* Frontend: [http://localhost:3000](http://localhost:3000)
-* Backend API: [http://localhost:8000](http://localhost:8000)
-* API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+Using Poetry:
+
+```bash
+poetry install
+```
+
+Or with pip if needed:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure environment variables
+
+Create a `.env` file in `backend/` and configure values such as:
+
+```env
+APP_NAME=DocMind
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/docmind
+OPENAI_API_KEY=your_api_key_here
+
+EMBEDDING_PROVIDER=sbert
+EMBEDDING_DIM=384
+AUTO_CREATE_TABLES=true
+```
+
+Only the embedding provider is configurable (`sbert` or `openai`). LLM answers use OpenAI API. Use `EMBEDDING_DIM=1536` when `EMBEDDING_PROVIDER=openai`.
+
+### 4. Start PostgreSQL and supporting services
+
+```bash
+docker compose up -d
+```
+
+### 5. Run the backend
+
+```bash
+poetry run uvicorn app.main:app --reload
+```
+
+### 6. Open API docs
+
+```text
+http://127.0.0.1:8000/docs
+```
 
 ---
 
-## Example Use Case
+## Example use cases
 
-DocMind is well‑suited for:
+The current version is suitable for scenarios such as:
 
-* Technical papers and research PDFs
-* Product documentation
-* Educational materials
-* Reports with figures and tables
-
-For demonstration, you can use the paper **“Attention Is All You Need”** to verify:
-
-* Text‑based Q&A
-* Architecture diagram retrieval
-* Table‑based performance comparison
-* Multi‑turn contextual conversations
-
----
-
-## Project Structure (Simplified)
-
-```
-backend/
-  app/
-    pipelines/        # Document ingestion pipeline
-    retrieval/        # Vector search & storage
-    rag/              # RAG & chat logic
-    llm/              # LLM adapters
-    embeddings/       # Embedding adapters
-frontend/
-  app/                # Next.js App Router
-```
-
----
-
-## Design Principles
-
-* **Production first**: engineering clarity over quick demos
-* **Extensible by design**: swap LLMs, embeddings, or storage
-* **Multimodal by default**: images and tables are first‑class citizens
-* **Transparent retrieval**: sources are traceable
+- uploading a PDF or other text-based document
+- asking factual questions about document content
+- retrieving semantically similar chunks
+- experimenting with embedding providers
+- demonstrating backend architecture for AI-enabled document systems
 
 ---
 
 ## Roadmap
 
-* [ ] OCR support for scanned PDFs
-* [ ] Multi‑document cross‑search
-* [ ] Streaming / real‑time chat
-* [ ] Plugin system for custom processors
-* [ ] Role‑based access & permissions
+### Phase 1 — current foundation
+- [x] FastAPI backend structure
+- [x] document upload flow
+- [x] text extraction
+- [x] chunking
+- [x] embeddings
+- [x] pgvector retrieval
+- [x] LLM answer generation
+- [x] local development setup
+
+### Phase 2 — retrieval quality improvements
+- [ ] stronger query rewriting strategy
+- [ ] better follow-up question handling
+- [ ] reranking improvements
+- [ ] retrieval evaluation and benchmark cases
+- [ ] better chunk selection for answer synthesis
+
+### Phase 3 — multimodal capabilities
+- [ ] table extraction
+- [ ] image extraction
+- [ ] OCR-enhanced parsing
+- [ ] multimodal asset indexing
+- [ ] stronger evidence grounding across text and structured assets
+
+### Phase 4 — engineering hardening
+- [ ] background ingestion workers or task orchestration
+- [ ] storage abstraction for cloud/object storage
+- [ ] migration-based schema management
+- [ ] auth / rate limiting
+- [ ] observability and metrics
+- [ ] deployment-oriented configuration strategy
+
+### Phase 5 — product layer
+- [ ] frontend application
+- [ ] better document management UX
+- [ ] chat session history UI
+- [ ] admin / ops support features
 
 ---
 
-## License
+## Interview talking points
 
-MIT License
+If you are reviewing this repository from an engineering interview perspective, the most relevant discussion points are:
+
+- why a backend-first architecture was chosen
+- how the project separates ingestion, retrieval, and answer generation
+- trade-offs between speed of delivery and production hardening
+- how text-first RAG can evolve toward multimodal document intelligence
+- where current abstractions are sufficient and where refactoring is still needed
+- how async APIs interact with AI workloads and blocking tasks
+- how retrieval quality should be evaluated rather than assumed
 
 ---
 
-## Author
+## Known limitations
 
-Maintained by a single engineer with a focus on **production-grade AI systems**, multimodal RAG, and scalable architecture.
+Current limitations include:
 
-Contributions and discussions are welcome.
+- the public version is primarily text-oriented
+- multimodal asset extraction is not complete
+- retrieval quality tuning is still evolving
+- evidence grounding is not yet strict enough for high-trust use cases
+- some engineering hardening steps are intentionally left for future phases
+
+These limitations are explicit by design so the roadmap remains realistic and discussion-friendly.
+
+---
+
+## Future direction
+
+The long-term goal of DocMind is to move from:
+
+**document chat MVP**  
+to  
+**document intelligence platform foundation**
+
+That means improving both:
+
+- **AI capability**
+- **engineering reliability**
+
+The project is intentionally being built in stages so each layer remains understandable, testable, and replaceable.
+
+---
+
+## Author notes
+
+This repository is maintained as a personal engineering project for:
+
+- backend architecture practice
+- AI application system design
+- retrieval and document intelligence experimentation
+- interview discussion and portfolio presentation
+
+Feedback, architecture suggestions, and implementation critiques are welcome.
+

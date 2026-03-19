@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "backend"
+version = "0.1.0"
+description = "Text-first document intelligence backend (multimodal-ready architecture)"
+authors = ["Michael"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+
+# ---- Web ----
+fastapi = "0.109.0"
+uvicorn = { version = "0.27.0", extras = ["standard"] }
+python-multipart = "0.0.6"
+
+# ---- Database ----
+sqlalchemy = "2.0.25"
+psycopg2-binary = "2.9.9"
+alembic = "1.13.1"
+pgvector = "0.2.4"
+
+# ---- AI / LLM ----
+openai = "1.10.0"
+
+# ✅ Pin to avoid torch being auto-upgraded by Poetry resolution
+sentence-transformers = "2.3.1"
+
+# ---- Document / Multimodal ----
+docling = { version = "^2.70.0", python = ">=3.11,<4.0" }
+PyPDF2 = "3.0.1"
+Pillow = "10.2.0"
+
+# ✅ Critical: pin torch stack to versions that have macOS x86_64 wheels and match each other
+torch = "2.2.2"
+torchvision = "0.17.2"
+
+# ---- Config / Utils ----
+python-dotenv = "1.0.0"
+pydantic = ">=2.3.0,<3.0.0"
+pydantic-settings = ">=2.3.0,<3.0.0"
+aiofiles = "23.2.1"
+asyncpg = "^0.31.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "7.4.4"
+pytest-asyncio = "0.23.3"
+httpx = "0.26.0"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
