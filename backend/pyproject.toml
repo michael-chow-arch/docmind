@@ -1,40 +1,38 @@
 [tool.poetry]
 name = "backend"
 version = "0.1.0"
-description = "Text-first document intelligence backend (multimodal-ready architecture)"
+description = "Backend for document upload, retrieval, and answer generation"
 authors = ["Michael"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 
-# ---- Web ----
+# Web
 fastapi = "0.109.0"
 uvicorn = { version = "0.27.0", extras = ["standard"] }
 python-multipart = "0.0.6"
 
-# ---- Database ----
+# Database
 sqlalchemy = "2.0.25"
 psycopg2-binary = "2.9.9"
 alembic = "1.13.1"
 pgvector = "0.2.4"
 
-# ---- AI / LLM ----
+# AI / LLM
 openai = "1.10.0"
-
-# ✅ Pin to avoid torch being auto-upgraded by Poetry resolution
 sentence-transformers = "2.3.1"
 
-# ---- Document / Multimodal ----
+# Document processing
 docling = { version = "^2.70.0", python = ">=3.11,<4.0" }
 PyPDF2 = "3.0.1"
 Pillow = "10.2.0"
 
-# ✅ Critical: pin torch stack to versions that have macOS x86_64 wheels and match each other
+# Local runtime compatibility
 torch = "2.2.2"
 torchvision = "0.17.2"
 
-# ---- Config / Utils ----
+# Config / Utils
 python-dotenv = "1.0.0"
 pydantic = ">=2.3.0,<3.0.0"
 pydantic-settings = ">=2.3.0,<3.0.0"

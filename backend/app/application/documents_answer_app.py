@@ -306,7 +306,7 @@ class DocumentsAnswerApp:
                 prompt = self._build_initial_prompt(question, context)
             
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=getattr(settings, "OPENAI_CHAT_MODEL", "gpt-3.5-turbo"),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=500,
@@ -344,50 +344,51 @@ class DocumentsAnswerApp:
             }
 
     def _build_initial_prompt(self, question: str, context: str) -> str:
-        return f"""You are a document Q&A assistant. Answer the question based ONLY on the provided document chunks.
+        return f"""Use only the document chunks below to answer the question.
 
-Rules:
-1. Answer ONLY using information from the provided chunks. Do not use external knowledge.
-2. If the chunks don't contain enough information, say so clearly.
-3. Cite specific chunks using [Chunk X] format where X is the chunk_id.
-4. Produce a structured JSON response with:
-   - "summary": A concise answer (2-3 sentences)
-   - "key_points": Array of 3-5 key points from the chunks
+    Requirements:
+    - Do not use outside knowledge.
+    - If the chunks are insufficient, say that directly.
+    - Keep "summary" to 2-3 sentences.
+    - Keep "key_points" concise and factual.
+    - Do not invent facts or citations.
+    - Return JSON only.
 
-Question: {question}
+    Question:
+    {question}
 
-Document Chunks:
-{context}
+    Chunks:
+    {context}
 
-Respond with valid JSON only, no markdown formatting:
-{{
-  "summary": "...",
-  "key_points": ["...", "..."]
-}}"""
+    Return:
+    {{
+      "summary": "...",
+      "key_points": ["...", "..."]
+    }}"""
 
     def _build_follow_up_prompt(self, question: str, context: str, topic_summary: str) -> str:
-        return f"""You are answering a follow-up question within an ongoing discussion about a document.
-The topic has already been established. Do NOT re-summarize the document or restate the full context.
+        return f"""Answer the follow-up question using only the document chunks below.
 
-Established Topic: {topic_summary}
+    Existing topic:
+    {topic_summary}
 
-Rules:
-1. Answer ONLY using information from the provided chunks. Do not use external knowledge.
-2. This is a follow-up question - focus on clarification, extension, or deepening the discussion.
-3. Do NOT re-summarize the document or restate what was already discussed.
-4. If the chunks don't contain enough information, say so clearly.
-5. Cite specific chunks using [Chunk X] format where X is the chunk_id.
-6. Produce a structured JSON response with:
-   - "summary": A concise answer (2-3 sentences) that builds on the established topic
-   - "key_points": Array of 3-5 key points that extend or clarify the discussion
+    Requirements:
+    - Treat this as a continuation of the current discussion.
+    - Do not restate the whole document.
+    - Do not use outside knowledge.
+    - If the chunks are insufficient, say that directly.
+    - Keep "summary" to 2-3 sentences.
+    - Keep "key_points" concise and factual.
+    - Return JSON only.
 
-Follow-up Question: {question}
+    Follow-up question:
+    {question}
 
-Relevant Document Chunks:
-{context}
+    Chunks:
+    {context}
 
-Respond with valid JSON only, no markdown formatting:
-{{
-  "summary": "...",
-  "key_points": ["...", "..."]
-}}"""
+    Return:
+    {{
+      "summary": "...",
+      "key_points": ["...", "..."]
+    }}"""

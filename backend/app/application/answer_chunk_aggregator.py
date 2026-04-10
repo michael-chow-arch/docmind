@@ -1,4 +1,5 @@
-"""Heuristic chunk reranker. Biased toward academic/technical text. Not a research-grade component."""
+"""Simple chunk reranker used before answer generation."""
+
 from __future__ import annotations
 
 import re
@@ -21,156 +22,134 @@ class ScoredChunk(TypedDict):
 
 
 class AnswerChunkAggregator:
-    def __init__(self, max_chunks: int = 5):
+    def __init__(self, max_chunks: int = 5, similarity_threshold: float = 0.75):
         self.max_chunks = max_chunks
-        # Heuristic: biased toward academic/technical text.
-        self.quality_phrases = [
-            "is defined as",
-            "we propose",
-            "in this work",
-            "we present",
-            "the model",
-            "this paper",
-            "we introduce",
-            "is described as",
-            "refers to",
-            "means that",
-        ]
-        
-        self.low_quality_patterns = [
-            r"^\s*\[\d+\]",
-            r"^\s*\d+\.\s*\d+",
-        ]
+        self.similarity_threshold = similarity_threshold
 
     def aggregate(self, query: str, chunks: list[RetrievedChunk]) -> list[ScoredChunk]:
         if not chunks:
             return []
+
         normalized_chunks = self._normalize_scores(chunks)
-        quality_scored = self._score_content_quality(normalized_chunks)
-        redundancy_penalized = self._apply_redundancy_penalty(quality_scored)
-        scored_chunks = self._calculate_answer_weight(redundancy_penalized)
+        query_tokens = self._tokenize(query)
+
+        scored_chunks: list[ScoredChunk] = []
+        for chunk in normalized_chunks:
+            content = chunk["content"]
+            content_tokens = self._tokenize(content)
+
+            overlap_score = self._overlap_ratio(query_tokens, content_tokens)
+            length_score = self._length_score(content)
+            structure_penalty = self._structure_penalty(content)
+
+            answer_weight = (
+                0.70 * chunk["normalized_score"]
+                + 0.20 * overlap_score
+                + 0.10 * length_score
+                - structure_penalty
+            )
+            answer_weight = max(0.0, answer_weight)
+
+            scored_chunks.append(
+                {
+                    "chunk_id": chunk["chunk_id"],
+                    "content": chunk["content"],
+                    "page_number": chunk.get("page_number"),
+                    "score": chunk["score"],
+                    "answer_weight": answer_weight,
+                }
+            )
+
         scored_chunks.sort(key=lambda x: x["answer_weight"], reverse=True)
-        
-        return scored_chunks[:self.max_chunks]
+        deduplicated = self._deduplicate(scored_chunks)
+
+        return deduplicated[: self.max_chunks]
 
     def _normalize_scores(self, chunks: list[RetrievedChunk]) -> list[dict]:
-        if not chunks:
-            return []
-        
         scores = [c["score"] for c in chunks]
         min_score = min(scores)
         max_score = max(scores)
-        
+
         if max_score == min_score:
-            normalized = [0.5] * len(chunks)
+            normalized_scores = [0.5] * len(chunks)
         else:
-            normalized = [
-                (s - min_score) / (max_score - min_score)
-                for s in scores
+            normalized_scores = [
+                (score - min_score) / (max_score - min_score)
+                for score in scores
             ]
-        
-        result = []
-        for chunk, norm_score in zip(chunks, normalized):
-            chunk_copy = dict(chunk)
-            chunk_copy["normalized_score"] = norm_score
-            result.append(chunk_copy)
-        
+
+        result: list[dict] = []
+        for chunk, normalized_score in zip(chunks, normalized_scores):
+            item = dict(chunk)
+            item["normalized_score"] = normalized_score
+            result.append(item)
+
         return result
 
-    def _score_content_quality(self, chunks: list[dict]) -> list[dict]:
-        result = []
-        
-        for chunk in chunks:
-            content = chunk.get("content", "").lower()
-            content_length = len(content)
-            
-            quality_score = 0.5
-            phrase_count = sum(1 for phrase in self.quality_phrases if phrase in content)
-            if phrase_count > 0:
-                quality_score += min(0.3, phrase_count * 0.1)
-            
-            if 100 <= content_length <= 2000:
-                quality_score += 0.1
-            elif content_length < 50:
-                quality_score -= 0.2
-            elif content_length > 5000:
-                quality_score -= 0.1
-            for pattern in self.low_quality_patterns:
-                if re.search(pattern, content):
-                    quality_score -= 0.2
+    def _length_score(self, content: str) -> float:
+        length = len(content.strip())
+
+        if 120 <= length <= 1200:
+            return 1.0
+        if 60 <= length < 120 or 1200 < length <= 2500:
+            return 0.6
+        if 20 <= length < 60:
+            return 0.2
+        return 0.0
+
+    def _structure_penalty(self, content: str) -> float:
+        text = content.strip()
+
+        if not text:
+            return 0.3
+
+        if re.match(r"^\s*(\[\d+\]|\d+\.\d+)", text):
+            return 0.10
+
+        if len(text) < 30:
+            return 0.15
+
+        return 0.0
+
+    def _deduplicate(self, chunks: list[ScoredChunk]) -> list[ScoredChunk]:
+        selected: list[ScoredChunk] = []
+
+        for candidate in chunks:
+            candidate_tokens = self._tokenize(candidate["content"])
+            is_duplicate = False
+
+            for existing in selected:
+                existing_tokens = self._tokenize(existing["content"])
+                similarity = self._jaccard_similarity(candidate_tokens, existing_tokens)
+                if similarity >= self.similarity_threshold:
+                    is_duplicate = True
                     break
-            quality_score = max(0.0, min(1.0, quality_score))
-            
-            chunk_copy = dict(chunk)
-            chunk_copy["quality_score"] = quality_score
-            result.append(chunk_copy)
-        
-        return result
 
-    def _apply_redundancy_penalty(self, chunks: list[dict]) -> list[dict]:
-        result = []
-        for i, chunk in enumerate(chunks):
-            content_i = self._tokenize(chunk.get("content", ""))
-            max_overlap = 0.0
-            
-            for j, other_chunk in enumerate(chunks):
-                if i == j:
-                    continue
-                
-                content_j = self._tokenize(other_chunk.get("content", ""))
-                overlap = self._jaccard_similarity(content_i, content_j)
-                max_overlap = max(max_overlap, overlap)
-            
-            if max_overlap > 0.5:
-                redundancy_penalty = min(1.0, (max_overlap - 0.5) * 2)
-            else:
-                redundancy_penalty = 0.0
-            
-            chunk_copy = dict(chunk)
-            chunk_copy["redundancy_penalty"] = redundancy_penalty
-            result.append(chunk_copy)
-        
-        return result
+            if not is_duplicate:
+                selected.append(candidate)
 
-    def _calculate_answer_weight(self, chunks: list[dict]) -> list[ScoredChunk]:
-        result = []
-        
-        for chunk in chunks:
-            normalized_score = chunk.get("normalized_score", 0.0)
-            quality_score = chunk.get("quality_score", 0.0)
-            redundancy_penalty = chunk.get("redundancy_penalty", 0.0)
-            
-            answer_weight = (
-                0.6 * normalized_score
-                + 0.3 * quality_score
-                - 0.3 * redundancy_penalty
-            )
-            
-            answer_weight = max(0.0, answer_weight)
-            
-            scored_chunk: ScoredChunk = {
-                "chunk_id": chunk["chunk_id"],
-                "content": chunk["content"],
-                "page_number": chunk.get("page_number"),
-                "score": chunk["score"],
-                "answer_weight": answer_weight,
-            }
-            result.append(scored_chunk)
-        
-        return result
+        return selected
 
     def _tokenize(self, text: str) -> set[str]:
-        tokens = re.findall(r'\b\w+\b', text.lower())
-        return {t for t in tokens if len(t) > 2}
+        return {
+            token
+            for token in re.findall(r"\b\w+\b", text.lower())
+            if len(token) > 1
+        }
 
-    def _jaccard_similarity(self, set1: set[str], set2: set[str]) -> float:
-        if not set1 or not set2:
+    def _overlap_ratio(self, query_tokens: set[str], content_tokens: set[str]) -> float:
+        if not query_tokens or not content_tokens:
             return 0.0
-        
-        intersection = len(set1 & set2)
-        union = len(set1 | set2)
-        
-        if union == 0:
+
+        overlap = len(query_tokens & content_tokens)
+        return overlap / len(query_tokens)
+
+    def _jaccard_similarity(self, left: set[str], right: set[str]) -> float:
+        if not left or not right:
             return 0.0
-        
-        return intersection / union
+
+        union = left | right
+        if not union:
+            return 0.0
+
+        return len(left & right) / len(union)
