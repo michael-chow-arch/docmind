@@ -1,8 +1,3 @@
--- Migration: Add conversations and conversation_messages tables
--- TODO: If Alembic is added to the project, convert this to an Alembic migration
-
--- Drop existing tables if they exist (for development)
--- In production, use proper migration tooling
 DROP TABLE IF EXISTS conversation_messages CASCADE;
 DROP TABLE IF EXISTS conversations CASCADE;
 
